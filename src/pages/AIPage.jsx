@@ -31,7 +31,6 @@ async function callAI(trades, stats, userPrompt) {
     maxLossStreak: stats.maxLossStreak,
     largestWin:    +fmt(stats.largestWin),
     largestLoss:   +fmt(stats.largestLoss),
-    avgDuration:   stats.avgDuration ? Math.round(stats.avgDuration/60)+'min' : '—',
     longWinRate:   +fmt(stats.longWR),
     shortWinRate:  +fmt(stats.shortWR),
     longPnL:       +fmt(stats.longPnL),
@@ -130,7 +129,7 @@ export default function AIPage({ trades, stats }) {
       <div style={{ marginBottom:24,paddingBottom:16,borderBottom:`1px solid ${T.border}` }}>
         <div style={{ fontSize:11,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,marginBottom:4,fontWeight:500 }}>AI Trading Coach</div>
         <div style={{ fontSize:24,fontWeight:700,color:T.text,letterSpacing:-0.5 }}>AI Analysis</div>
-        <div style={{ fontSize:12,color:T.muted,marginTop:4 }}>Powered by Claude · {trades.length} trades analysed</div>
+        <div style={{ fontSize:12,color:T.muted,marginTop:4 }}>Powered by Llama 3.3 70B (Free) · {trades.length} trades analysed</div>
       </div>
 
       {/* Stats snapshot */}
@@ -160,8 +159,15 @@ export default function AIPage({ trades, stats }) {
               {analysis && <Btn onClick={()=>{setAnalysis('');setPrompt('')}}>Clear</Btn>}
             </div>
             {error && (
-              <div style={{ marginTop:12,background:T.redDim,border:`1px solid ${T.red}33`,borderRadius:8,padding:'10px 14px',color:T.red,fontSize:12,lineHeight:1.7,whiteSpace:'pre-wrap' }}>
-                {error}
+              <div style={{ marginTop:12,background:T.redDim,border:`1px solid ${T.red}55`,borderRadius:8,padding:'14px 16px',lineHeight:1.8 }}>
+                <div style={{ color:T.red,fontWeight:600,fontSize:12,marginBottom:8 }}>⚠ Error</div>
+                <div style={{ color:T.red,fontSize:12,whiteSpace:'pre-wrap' }}>{error}</div>
+                <div style={{ marginTop:10,paddingTop:10,borderTop:`1px solid ${T.red}33` }}>
+                  <div style={{ fontSize:11,color:T.muted,marginBottom:6 }}>Debug: open this in your browser to check if the function is running:</div>
+                  <code style={{ fontSize:11,color:T.accent,background:T.surface,padding:'4px 8px',borderRadius:4,display:'block' }}>
+                    http://localhost:8888/.netlify/functions/ai
+                  </code>
+                </div>
               </div>
             )}
           </Card>

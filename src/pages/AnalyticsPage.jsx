@@ -4,7 +4,7 @@ import {
   ReferenceLine, Cell, ResponsiveContainer
 } from 'recharts'
 import { THEME as T, colorPnL } from '../lib/theme'
-import { fmt, fmtDur } from '../lib/data'
+import { fmt } from '../lib/data'
 import { Card, SectionHead, ChartTooltip } from '../components/UI'
 
 export default function AnalyticsPage({ trades, stats }) {
@@ -155,20 +155,7 @@ export default function AnalyticsPage({ trades, stats }) {
           </ResponsiveContainer>
         </Card>
 
-        <Card>
-          <SectionHead title="Trade Duration vs P&L" sub="Hold Time Analysis" />
-          <ResponsiveContainer width="100%" height={220}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="dur" name="Duration (min)" tick={{ fill: T.muted, fontSize: 10 }} />
-              <YAxis dataKey="pnl" name="P&L" tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => '$'+fmt(v,0)} />
-              <ReferenceLine y={0} stroke={T.muted} strokeDasharray="3 3" />
-              <Tooltip content={<ChartTooltip formatter={(v,n) => n==='dur' ? v+' min' : '$'+fmt(v)} />} cursor={{ strokeDasharray: '3 3' }} />
-              <Scatter data={durVsPnl} fill={T.blue} opacity={0.6} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
+</div>
 
       {/* Row 4: Hour heatmap grid */}
       <Card style={{ marginBottom: 16 }}>

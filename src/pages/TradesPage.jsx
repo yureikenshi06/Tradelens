@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { THEME as T, colorPnL } from '../lib/theme'
-import { fmt, fmtDate, fmtTime, fmtUSD, fmtDur } from '../lib/data'
+import { fmt, fmtDate, fmtTime, fmtUSD } from '../lib/data'
 import { Card, SectionHead, Badge, Btn, Select } from '../components/UI'
 
 const COLS = [
@@ -14,7 +14,6 @@ const COLS = [
   { key: 'pnl',      label: 'P&L',       width: 100 },
   { key: 'fee',      label: 'Fee',       width: 80  },
   { key: 'riskPercent',label: 'Risk%',   width: 65  },
-  { key: 'duration', label: 'Duration',  width: 80  },
   { key: 'equity',   label: 'Equity',    width: 100 },
   { key: 'time',     label: 'Date/Time', width: 160 },
 ]
@@ -155,7 +154,6 @@ export default function TradesPage({ trades }) {
                     </td>
                     <td style={{ padding: '9px 14px', fontSize: 11, color: T.red }}>-${fmt(tr.fee, 4)}</td>
                     <td style={{ padding: '9px 14px', fontSize: 11, color: tr.riskPercent > 2 ? T.red : T.textMid }}>{fmt(tr.riskPercent, 2)}%</td>
-                    <td style={{ padding: '9px 14px', fontSize: 11, color: T.muted }}>{fmtDur(tr.duration)}</td>
                     <td style={{ padding: '9px 14px', fontSize: 12, color: T.textMid, fontVariantNumeric: 'tabular-nums' }}>${fmt(tr.equity)}</td>
                     <td style={{ padding: '9px 14px', fontSize: 11, color: T.muted, whiteSpace: 'nowrap' }}>
                       {fmtDate(tr.time)} <span style={{ color: T.border }}>·</span> {fmtTime(tr.time)}

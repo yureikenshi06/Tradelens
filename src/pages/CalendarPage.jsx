@@ -127,9 +127,12 @@ export default function CalendarPage({ trades, stats }) {
                 const isToday    = cell.key === todayKey
                 const isSel      = cell.key === selected
                 const hasNote    = !!notes[cell.key]
+                const greenShades = ['#071a0e','#0a2614','#0d331a','#104021','#144f29','#186032','#1d743c','#228b47']
+                const redShades   = ['#1a0707','#26090a','#330b0b','#410e0e','#501111','#601414','#741818','#8b1c1c']
+                const shadeIdx    = Math.min(7, Math.floor(intensity * 8))
                 const bg = !hasTrades ? T.surface
-                  : isPos ? `rgba(34,197,94,${0.1+intensity*0.5})`
-                  : `rgba(239,68,68,${0.1+intensity*0.5})`
+                  : isPos ? greenShades[shadeIdx]
+                  : redShades[shadeIdx]
                 const bdr = isSel ? `2px solid ${T.accent}`
                   : isToday ? `1px solid ${T.accent}66`
                   : hasTrades ? `1px solid ${(isPos?T.green:T.red)}44`
