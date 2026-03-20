@@ -1,0 +1,30 @@
+export const THEME = {
+  bg:        '#080b0f',
+  bgDeep:    '#050709',
+  surface:   '#0d1117',
+  card:      '#111820',
+  cardHover: '#141e28',
+  border:    '#1a2535',
+  borderMid: '#243347',
+  text:      '#dce8f5',
+  textMid:   '#8ba3bc',
+  muted:     '#4d6478',
+  accent:    '#f0b90b',
+  accentDim: 'rgba(240,185,11,0.12)',
+  accentGlow:'rgba(240,185,11,0.25)',
+  green:     '#00d68f',
+  greenDim:  'rgba(0,214,143,0.12)',
+  red:       '#ff4d6a',
+  redDim:    'rgba(255,77,106,0.12)',
+  blue:      '#3d9eff',
+  blueDim:   'rgba(61,158,255,0.12)',
+  purple:    '#c084fc',
+  purpleDim: 'rgba(192,132,252,0.12)',
+  cyan:      '#22d3ee',
+  cyanDim:   'rgba(34,211,238,0.12)',
+  fontDisplay: "'Syne', sans-serif",
+  fontMono:    "'JetBrains Mono', monospace",
+}
+
+export const colorPnL = (n) => n >= 0 ? THEME.green : THEME.red
+export const bgPnL    = (n) => n >= 0 ? THEME.greenDim : THEME.redDim
