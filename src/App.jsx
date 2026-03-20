@@ -16,7 +16,10 @@ import { Spinner }   from './components/UI'
 
 function AppInner() {
   const { user, loading: authLoading } = useAuth()
-  const { trades, stats, loading, connected, source, loadDemo, connectBinance } = useTrades()
+  const {
+    trades, stats, loading, connected, source,
+    error, progress, loadDemo, connectBinance,
+  } = useTrades()
   const [page, setPage] = useState('dashboard')
 
   if (authLoading) {
@@ -29,7 +32,7 @@ function AppInner() {
     )
   }
 
-  // Remove this block to disable auth and run locally without login
+  // Remove this block to run without login (local-only mode)
   if (!user) return <LoginPage />
 
   const shared = { trades, stats }
@@ -41,7 +44,14 @@ function AppInner() {
     symbols:   <SymbolsPage   {...shared} />,
     notes:     <NotesPage     {...shared} />,
     ai:        <AIPage        {...shared} />,
-    settings:  <SettingsPage  {...shared} source={source} onConnectBinance={connectBinance} onLoadDemo={loadDemo} />,
+    settings:  <SettingsPage
+                 {...shared}
+                 source={source}
+                 error={error}
+                 progress={progress}
+                 onConnectBinance={connectBinance}
+                 onLoadDemo={loadDemo}
+               />,
   }
 
   return (
@@ -49,7 +59,9 @@ function AppInner() {
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh', flexDirection: 'column', gap: 16 }}>
           <Spinner size={36} />
-          <div style={{ fontSize: 12, color: T.muted, fontFamily: T.fontMono }}>Loading trade data...</div>
+          <div style={{ fontSize: 12, color: T.muted, fontFamily: T.fontMono }}>
+            {progress || 'Loading trade data...'}
+          </div>
         </div>
       ) : pages[page]}
     </Layout>
@@ -57,7 +69,5 @@ function AppInner() {
 }
 
 export default function App() {
-  return (
-    <AuthProvider><AppInner /></AuthProvider>
-  )
+  return <AuthProvider><AppInner /></AuthProvider>
 }
