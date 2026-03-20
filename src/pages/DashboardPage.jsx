@@ -1,369 +1,314 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar, ComposedChart,
+  AreaChart, Area, BarChart, Bar, ComposedChart, LineChart, Line,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
+  ResponsiveContainer, ReferenceArea, ReferenceDot
 } from 'recharts'
-import { THEME as T, colorPnL, bgPnL } from '../lib/theme'
-import { fmt, fmtUSD, fmtDate, fmtPct } from '../lib/data'
-import { KpiCard, Card, SectionHead, Badge, ProgressBar, ChartTooltip } from '../components/UI'
+import { THEME as T, colorPnL } from '../lib/theme'
+import { fmt, fmtUSD, fmtDate, fmtPct, fmtDur } from '../lib/data'
+import { KpiCard, Card, SectionHead, Badge, ProgressBar, ChartTooltip, Select } from '../components/UI'
 
-function MiniStat({ label, val, color }) {
-  return (
-    <div style={{ padding: '10px 14px', background: T.surface, borderRadius: 8, flex: 1 }}>
-      <div style={{ fontSize: 9, color: T.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: color || T.text, fontFamily: T.fontDisplay }}>{val}</div>
-    </div>
-  )
-}
+const PERIOD_OPTIONS = [
+  { value: 'weekly',    label: 'Weekly' },
+  { value: 'monthly',   label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly',    label: 'Yearly' },
+]
 
 export default function DashboardPage({ trades, stats }) {
-  if (!trades?.length) return <div style={{ padding: 32, color: T.muted }}>No trade data loaded.</div>
+  const [period, setPeriod] = useState('monthly')
 
-  const initEquity = 10000
-  const returnPct  = ((stats.totalPnL / initEquity) * 100).toFixed(2)
+  if (!trades?.length) return <div style={{ padding:32,color:T.muted }}>No trade data loaded.</div>
 
-  // Radar data
+  const startEquity = trades[0]?.equity - trades[0]?.pnl + trades[0]?.fee || 10000
+  const endEquity   = trades[trades.length-1]?.equity || 10000
+  const returnPct   = ((endEquity - startEquity) / startEquity * 100).toFixed(2)
+
+  // Period bar chart data
+  const periodData = period === 'weekly'    ? stats.weeklyArr?.map(d=>({ label:d.w,   pnl:d.pnl, trades:d.trades, wr:d.wr, fees:d.fees }))
+    : period === 'monthly'   ? stats.monthlyArr?.map(d=>({ label:d.m,   pnl:d.pnl, trades:d.trades, wr:d.wr, fees:d.fees }))
+    : period === 'quarterly' ? stats.quarterlyArr?.map(d=>({ label:d.q, pnl:d.pnl, trades:d.trades, wr:d.wr, fees:d.fees }))
+    : stats.yearlyArr?.map(d=>({ label:d.y, pnl:d.pnl, trades:d.trades, wr:d.wr, fees:d.fees }))
+
+  // Equity curve — use cumPnL from stats
+  const equityData = stats.equityCurve || []
+
+  // Cumulative PnL separate
+  const cumPnLData = equityData.map(d => ({ i:d.i, cumPnL:d.cumPnL, date:d.date }))
+
+  // Radar
   const radarData = [
-    { metric: 'Win Rate',    val: Math.min(100, stats.winRate) },
-    { metric: 'R:R Ratio',  val: Math.min(100, parseFloat(stats.rr) * 20) },
-    { metric: 'Consistency',val: Math.min(100, stats.profitFactor * 25) },
-    { metric: 'Risk Ctrl',  val: Math.max(0, 100 - stats.maxDD * 2) },
-    { metric: 'Frequency',  val: Math.min(100, stats.total / 2) },
-    { metric: 'Diversify',  val: Math.min(100, stats.symbolArr?.length * 8) },
+    { metric:'Win Rate',    val: Math.min(100,stats.winRate) },
+    { metric:'R:R',         val: Math.min(100,parseFloat(stats.rr)*20) },
+    { metric:'Consistency', val: Math.min(100,(stats.profitFactor||0)*20) },
+    { metric:'Risk Ctrl',   val: Math.max(0,100-stats.maxDD*2) },
+    { metric:'Volume',      val: Math.min(100,stats.total/2) },
+    { metric:'Diversity',   val: Math.min(100,(stats.symbolArr?.length||0)*8) },
   ]
 
+  // Fees breakdown
+  const totalFeesPaid = stats.totalFees || 0
+  const feeVsPnL      = [(stats.grossProfit||0), totalFeesPaid, Math.abs(stats.grossLoss||0)]
+
   return (
-    <div style={{ padding: '28px 32px' }}>
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 9, color: T.accent, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 6 }}>Overview</div>
-        <div style={{ fontSize: 30, fontWeight: 800, fontFamily: T.fontDisplay, color: T.text, lineHeight: 1 }}>
-          Performance Dashboard
+    <div style={{ padding:'24px 28px',fontFamily:T.fontSans }}>
+      {/* Page header */}
+      <div style={{ marginBottom:24,paddingBottom:16,borderBottom:`1px solid ${T.border}` }}>
+        <div style={{ display:'flex',justifyContent:'space-between',alignItems:'flex-end' }}>
+          <div>
+            <div style={{ fontSize:11,color:T.muted,textTransform:'uppercase',letterSpacing:1.5,marginBottom:4,fontWeight:500 }}>Performance Overview</div>
+            <div style={{ fontSize:24,fontWeight:700,color:T.text,letterSpacing:-0.5 }}>Dashboard</div>
+          </div>
+          <div style={{ fontSize:11,color:T.muted }}>
+            {trades.length} trades · {fmtDate(trades[0]?.time)} – {fmtDate(trades[trades.length-1]?.time)}
+          </div>
         </div>
-        <div style={{ fontSize: 12, color: T.muted, marginTop: 8 }}>
-          {trades.length} trades · {fmtDate(trades[0]?.time)} – {fmtDate(trades[trades.length-1]?.time)}
-        </div>
       </div>
 
-      {/* ── KPI Grid Row 1 ──────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 14 }}>
-        <KpiCard label="Total P&L" value={(stats.totalPnL >= 0 ? '+$' : '-$') + fmt(Math.abs(stats.totalPnL))}
-          color={colorPnL(stats.totalPnL)} sub={`${returnPct}% return`} icon="💰" />
-        <KpiCard label="Win Rate"  value={fmt(stats.winRate) + '%'}
-          color={stats.winRate >= 50 ? T.green : T.red}
-          sub={`${stats.winners}W / ${stats.losers}L`} icon="🎯" />
-        <KpiCard label="Risk/Reward" value={stats.rr + 'x'}
-          color={parseFloat(stats.rr) >= 1.5 ? T.green : T.red}
-          sub={`Avg win $${fmt(stats.avgWin)}`} icon="⚖️" />
-        <KpiCard label="Max Drawdown" value={fmt(stats.maxDD) + '%'}
-          color={stats.maxDD < 10 ? T.green : stats.maxDD < 25 ? T.accent : T.red}
-          sub="Peak-to-trough" icon="📉" />
-        <KpiCard label="Profit Factor" value={isFinite(stats.profitFactor) ? fmt(stats.profitFactor) : '∞'}
-          color={stats.profitFactor >= 1.5 ? T.green : T.red}
-          sub="Gross profit ÷ loss" icon="📊" />
+      {/* KPI Row 1 */}
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:10 }}>
+        <KpiCard label="Net P&L"      value={(stats.netPnL>=0?'+$':'-$')+fmt(Math.abs(stats.netPnL||0))} color={colorPnL(stats.netPnL||0)} sub={`${returnPct}% return`} />
+        <KpiCard label="Gross P&L"    value={(stats.totalPnL>=0?'+$':'-$')+fmt(Math.abs(stats.totalPnL||0))} color={colorPnL(stats.totalPnL||0)} sub="Before fees" />
+        <KpiCard label="Win Rate"     value={fmt(stats.winRate)+'%'} color={stats.winRate>=50?T.green:T.red} sub={`${stats.winners}W / ${stats.losers}L`} />
+        <KpiCard label="Profit Factor" value={isFinite(stats.profitFactor)?fmt(stats.profitFactor):'∞'} color={stats.profitFactor>=1.5?T.green:T.red} sub="Gross profit ÷ loss" />
+        <KpiCard label="Max Drawdown" value={fmt(stats.maxDD)+'%'} color={stats.maxDD<10?T.green:stats.maxDD<25?T.accent:T.red} sub="Peak-to-trough" />
       </div>
 
-      {/* ── KPI Grid Row 2 ──────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
-        <KpiCard label="Sharpe Ratio" value={fmt(stats.sharpe)} icon="📐"
-          color={stats.sharpe >= 1 ? T.green : T.red} sub="Risk-adj return" />
-        <KpiCard label="Best Streak"  value={stats.maxWinStreak + 'W'} color={T.green} icon="🔥" sub="Consecutive wins" />
-        <KpiCard label="Worst Streak" value={stats.maxLossStreak + 'L'} color={T.red}  icon="❄️" sub="Consecutive losses" />
-        <KpiCard label="Total Fees"   value={'-$' + fmt(stats.totalFees)} color={T.red} icon="💸" sub="Total paid" />
-        <KpiCard label="Largest Win"  value={'+$' + fmt(stats.largestWin)}  color={T.green} icon="🚀" sub="Single trade" />
-        <KpiCard label="Largest Loss" value={'-$' + fmt(Math.abs(stats.largestLoss))} color={T.red} icon="💣" sub="Single trade" />
+      {/* KPI Row 2 */}
+      <div style={{ display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:20 }}>
+        <KpiCard label="Total Fees"   value={'-$'+fmt(totalFeesPaid)} color={T.red}    sub="All commissions" />
+        <KpiCard label="Risk/Reward"  value={stats.rr+'x'}           color={parseFloat(stats.rr)>=1.5?T.green:T.red} sub={`Avg win $${fmt(stats.avgWin)}`} />
+        <KpiCard label="Sharpe Ratio" value={fmt(stats.sharpe)}       color={stats.sharpe>=1?T.green:T.red} sub="Risk-adj return" />
+        <KpiCard label="Best Streak"  value={stats.maxWinStreak+'W'} color={T.green}  sub="Consecutive wins" />
+        <KpiCard label="Avg Duration" value={fmtDur(stats.avgDuration)} color={T.blue} sub={`Max ${fmtDur(stats.maxDuration)}`} />
+        <KpiCard label="Avg Risk"     value={fmt(stats.avgRiskPct)+'%'} color={stats.avgRiskPct>3?T.red:T.green} sub="Per trade" />
       </div>
 
-      {/* ── Equity Curve ─────────────────────────────────────────────────── */}
-      <Card style={{ marginBottom: 16 }} glow>
-        <SectionHead title="Equity Curve" sub="Account Growth" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 24, alignItems: 'center' }}>
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={stats.equityCurve}>
-              <defs>
-                <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={T.accent} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={T.accent} stopOpacity={0.02} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="i" tick={{ fill: T.muted, fontSize: 10, fontFamily: T.fontMono }} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10, fontFamily: T.fontMono }} tickFormatter={v => '$' + fmt(v, 0)} />
-              <Tooltip content={<ChartTooltip formatter={(v) => '$' + fmt(v)} />} />
-              <ReferenceLine y={initEquity} stroke={T.muted} strokeDasharray="4 4" label={{ value: 'Start', fill: T.muted, fontSize: 10 }} />
-              <Area type="monotone" dataKey="equity" stroke={T.accent} fill="url(#eqGrad)" strokeWidth={2.5} dot={false} name="Equity" />
-            </ComposedChart>
+      {/* Equity Curve + Cumulative PnL */}
+      <Card style={{ marginBottom:12 }} glow>
+        <SectionHead title="Equity Curve" sub="Account Growth" action={
+          <div style={{ fontSize:11,color:T.muted }}>Starting balance: ${fmt(startEquity)} → ${fmt(endEquity)}</div>
+        }/>
+        <ResponsiveContainer width="100%" height={240}>
+          <ComposedChart data={equityData} margin={{ left:8,right:8,top:4,bottom:4 }}>
+            <defs>
+              <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={T.accent} stopOpacity={0.25}/>
+                <stop offset="100%" stopColor={T.accent} stopOpacity={0.02}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 4" stroke={T.border} vertical={false}/>
+            <XAxis dataKey="i" tick={{ fill:T.muted,fontSize:10 }} tickLine={false} axisLine={{ stroke:T.border }}/>
+            <YAxis tick={{ fill:T.muted,fontSize:10,fontFamily:T.fontMono }} tickLine={false} axisLine={false}
+              tickFormatter={v=>'$'+fmt(v,0)} width={70}/>
+            <Tooltip content={<ChartTooltip formatter={v=>'$'+fmt(v)} />}/>
+            <ReferenceLine y={startEquity} stroke={T.muted} strokeDasharray="4 4" strokeOpacity={0.5}/>
+            <Area type="monotone" dataKey="equity" stroke={T.accent} fill="url(#eqGrad)" strokeWidth={2} dot={false} name="Equity"/>
+          </ComposedChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Cumulative PnL */}
+      <Card style={{ marginBottom:12 }}>
+        <SectionHead title="Cumulative P&L" sub="Running Total"/>
+        <ResponsiveContainer width="100%" height={180}>
+          <AreaChart data={cumPnLData} margin={{ left:8,right:8,top:4,bottom:4 }}>
+            <defs>
+              <linearGradient id="cpGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stopColor={T.green} stopOpacity={0.25}/>
+                <stop offset="100%" stopColor={T.green} stopOpacity={0.02}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="2 4" stroke={T.border} vertical={false}/>
+            <XAxis dataKey="i" hide/>
+            <YAxis tick={{ fill:T.muted,fontSize:10,fontFamily:T.fontMono }} tickLine={false} axisLine={false}
+              tickFormatter={v=>(v>=0?'+$':'-$')+fmt(Math.abs(v),0)} width={70}/>
+            <ReferenceLine y={0} stroke={T.border} strokeDasharray="4 4"/>
+            <Tooltip content={<ChartTooltip formatter={v=>(v>=0?'+$':'-$')+fmt(Math.abs(v))} />}/>
+            <Area type="monotone" dataKey="cumPnL" stroke={T.green} fill="url(#cpGrad)" strokeWidth={2} dot={false} name="Cum P&L"/>
+          </AreaChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Period Performance — dropdown selector */}
+      <Card style={{ marginBottom:12 }}>
+        <SectionHead title={`${PERIOD_OPTIONS.find(p=>p.value===period)?.label} Performance`} sub="P&L by Period"
+          action={
+            <Select value={period} onChange={setPeriod} options={PERIOD_OPTIONS} style={{ fontSize:11,padding:'4px 10px' }}/>
+          }/>
+        {periodData?.length > 0 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={periodData} barSize={Math.max(8, Math.min(28, 200/periodData.length))} margin={{ left:8,right:8,top:4,bottom:4 }}>
+              <CartesianGrid strokeDasharray="2 4" stroke={T.border} vertical={false}/>
+              <XAxis dataKey="label" tick={{ fill:T.muted,fontSize:10 }} tickLine={false} axisLine={{ stroke:T.border }}/>
+              <YAxis tick={{ fill:T.muted,fontSize:10,fontFamily:T.fontMono }} tickLine={false} axisLine={false}
+                tickFormatter={v=>(v>=0?'+$':'-$')+fmt(Math.abs(v),0)} width={70}/>
+              <ReferenceLine y={0} stroke={T.border}/>
+              <Tooltip content={({ active,payload,label }) => {
+                if (!active||!payload?.length) return null
+                const d = payload[0]?.payload
+                return (
+                  <div style={{ background:T.card,border:`1px solid ${T.borderMid}`,borderRadius:8,padding:'10px 14px',fontFamily:T.fontMono,fontSize:11 }}>
+                    <div style={{ color:T.muted,marginBottom:6 }}>{label}</div>
+                    <div style={{ color:colorPnL(d?.pnl),marginBottom:3 }}>P&L: {d?.pnl>=0?'+$':'-$'}{fmt(Math.abs(d?.pnl))}</div>
+                    <div style={{ color:T.muted }}>Trades: {d?.trades} · WR: {d?.wr}%</div>
+                    <div style={{ color:T.red }}>Fees: -${fmt(d?.fees)}</div>
+                  </div>
+                )
+              }}/>
+              <Bar dataKey="pnl" name="P&L" radius={[3,3,0,0]}>
+                {periodData.map((d,i)=><Cell key={i} fill={d.pnl>=0?T.green:T.red} opacity={0.85}/>)}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        ) : <div style={{ color:T.muted,fontSize:12,padding:'32px 0',textAlign:'center' }}>No data for this period</div>}
+      </Card>
+
+      {/* Row: Fees + Duration + Long/Short */}
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12 }}>
+
+        {/* Fees breakdown */}
+        <Card>
+          <SectionHead title="Fee Analysis" sub="Cost of Trading"/>
+          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
             {[
-              { l: 'Starting Capital', v: '$' + fmt(initEquity), c: T.textMid },
-              { l: 'Current Equity',   v: '$' + fmt(trades[trades.length-1]?.equity), c: T.accent },
-              { l: 'Net Return',       v: fmtPct(returnPct), c: colorPnL(stats.totalPnL) },
-              { l: 'Total Fees',       v: '-$' + fmt(stats.totalFees), c: T.red },
-              { l: 'Net of Fees',      v: (stats.totalPnL - stats.totalFees >= 0 ? '+$' : '-$') + fmt(Math.abs(stats.totalPnL - stats.totalFees)), c: colorPnL(stats.totalPnL - stats.totalFees) },
-            ].map(row => (
-              <div key={row.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: T.surface, borderRadius: 8 }}>
-                <span style={{ fontSize: 11, color: T.muted }}>{row.l}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: row.c }}>{row.v}</span>
+              { l:'Total Fees Paid',    v:'-$'+fmt(totalFeesPaid),           c:T.red },
+              { l:'Fees as % of Gross', v:stats.grossProfit ? fmt(totalFeesPaid/stats.grossProfit*100)+'%':'—', c:T.accent },
+              { l:'Avg Fee per Trade',  v:'-$'+fmt(totalFeesPaid/trades.length), c:T.red },
+              { l:'Gross P&L',          v:(stats.grossProfit>=0?'+$':'-$')+fmt(Math.abs(stats.grossProfit)), c:T.green },
+              { l:'Net P&L (after fees)',v:(stats.netPnL>=0?'+$':'-$')+fmt(Math.abs(stats.netPnL||0)), c:colorPnL(stats.netPnL||0) },
+            ].map(r => (
+              <div key={r.l} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${T.border}` }}>
+                <span style={{ fontSize:11,color:T.muted }}>{r.l}</span>
+                <span style={{ fontSize:12,fontWeight:600,color:r.c,fontFamily:T.fontMono }}>{r.v}</span>
               </div>
             ))}
           </div>
+        </Card>
+
+        {/* Duration analysis */}
+        <Card>
+          <SectionHead title="Hold Duration" sub="Trade Duration"/>
+          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+            {[
+              { l:'Average Duration',   v:fmtDur(stats.avgDuration),  c:T.blue },
+              { l:'Shortest Trade',     v:fmtDur(stats.minDuration),  c:T.green },
+              { l:'Longest Trade',      v:fmtDur(stats.maxDuration),  c:T.accent },
+            ].map(r => (
+              <div key={r.l} style={{ display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${T.border}` }}>
+                <span style={{ fontSize:11,color:T.muted }}>{r.l}</span>
+                <span style={{ fontSize:12,fontWeight:600,color:r.c,fontFamily:T.fontMono }}>{r.v}</span>
+              </div>
+            ))}
+            <div style={{ marginTop:4 }}>
+              <div style={{ fontSize:10,color:T.muted,marginBottom:8,textTransform:'uppercase',letterSpacing:1 }}>Duration by Symbol (avg)</div>
+              {(stats.symbolArr||[]).slice(0,4).map(s => (
+                <div key={s.sym} style={{ display:'flex',justifyContent:'space-between',padding:'4px 0' }}>
+                  <span style={{ fontSize:11,color:T.textMid }}>{s.sym.replace('USDT','')}</span>
+                  <span style={{ fontSize:11,color:T.muted,fontFamily:T.fontMono }}>{fmtDur(s.avgDuration)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Long vs Short */}
+        <Card>
+          <SectionHead title="Long vs Short" sub="Side Performance"/>
+          <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+            {[
+              { l:'Long Trades', v:stats.longs, extra:`${fmt(stats.longWR)}% WR`, pnl:stats.longPnL, c:T.blue },
+              { l:'Short Trades',v:stats.shorts,extra:`${fmt(stats.shortWR)}% WR`, pnl:stats.shortPnL, c:T.purple },
+            ].map(r=>(
+              <div key={r.l} style={{ background:T.surface,borderRadius:8,padding:'12px 14px',border:`1px solid ${T.border}` }}>
+                <div style={{ display:'flex',justifyContent:'space-between',marginBottom:6 }}>
+                  <span style={{ fontSize:11,color:r.c,fontWeight:600 }}>{r.l}</span>
+                  <span style={{ fontSize:11,color:T.muted }}>{r.v} trades · {r.extra}</span>
+                </div>
+                <div style={{ fontSize:18,fontWeight:700,color:colorPnL(r.pnl),fontFamily:T.fontMono }}>{r.pnl>=0?'+$':'-$'}{fmt(Math.abs(r.pnl))}</div>
+                <div style={{ marginTop:8 }}>
+                  <ProgressBar value={r.v} max={trades.length} color={r.c} height={3}/>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* Symbol performance table */}
+      <Card style={{ marginBottom:12 }}>
+        <SectionHead title="Symbol Performance" sub="Ranked by P&L"/>
+        <div style={{ display:'grid',gridTemplateColumns:'24px 100px 1fr 90px 55px 55px 70px 70px',gap:10,alignItems:'center',padding:'0 0 8px',borderBottom:`1px solid ${T.border}`,marginBottom:4 }}>
+          {['#','Symbol','','P&L','Trades','Win%','Fees','Avg Dur'].map(h=>(
+            <div key={h} style={{ fontSize:9,color:T.muted,textTransform:'uppercase',letterSpacing:1,fontWeight:500 }}>{h}</div>
+          ))}
         </div>
+        {(stats.symbolArr||[]).map((s,i) => {
+          const maxAbs = Math.max(...(stats.symbolArr||[]).map(x=>Math.abs(x.pnl)))
+          return (
+            <div key={s.sym} style={{ display:'grid',gridTemplateColumns:'24px 100px 1fr 90px 55px 55px 70px 70px',gap:10,alignItems:'center',padding:'8px 0',borderBottom:`1px solid ${T.border}` }}>
+              <div style={{ fontSize:10,color:T.muted,fontFamily:T.fontMono }}>{i+1}</div>
+              <div style={{ fontSize:13,fontWeight:600 }}>{s.sym.replace('USDT','')}<span style={{ color:T.muted,fontSize:10 }}>/USDT</span></div>
+              <ProgressBar value={Math.abs(s.pnl)} max={maxAbs} color={colorPnL(s.pnl)} height={3}/>
+              <div style={{ fontSize:13,fontWeight:600,color:colorPnL(s.pnl),fontFamily:T.fontMono,textAlign:'right' }}>{s.pnl>=0?'+$':'-$'}{fmt(Math.abs(s.pnl))}</div>
+              <div style={{ fontSize:11,color:T.muted,textAlign:'right' }}>{s.count}</div>
+              <div style={{ fontSize:11,color:parseFloat(s.wr)>=50?T.green:T.red,textAlign:'right' }}>{s.wr}%</div>
+              <div style={{ fontSize:11,color:T.red,textAlign:'right',fontFamily:T.fontMono }}>-${fmt(s.fees)}</div>
+              <div style={{ fontSize:11,color:T.muted,textAlign:'right' }}>{fmtDur(s.avgDuration)}</div>
+            </div>
+          )
+        })}
       </Card>
 
-      {/* ── Row: Cum PnL + Monthly ────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      {/* Win/Loss + Radar */}
+      <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:12 }}>
         <Card>
-          <SectionHead title="Cumulative P&L" sub="Running Total" />
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={stats.cumPnL}>
-              <defs>
-                <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={T.green} stopOpacity={0.3} />
-                  <stop offset="100%" stopColor={T.green} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis hide />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => '$' + fmt(v, 0)} />
-              <ReferenceLine y={0} stroke={T.muted} strokeDasharray="4 4" />
-              <Tooltip content={<ChartTooltip formatter={v => '$' + fmt(v)} />} />
-              <Area type="monotone" dataKey="cum" stroke={T.green} fill="url(#cumGrad)" strokeWidth={2} dot={false} name="Cum PnL" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <SectionHead title="Monthly P&L" sub="By Month" />
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={stats.monthlyArr} barSize={18}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="m" tick={{ fill: T.muted, fontSize: 10 }} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => '$' + fmt(v, 0)} />
-              <Tooltip content={<ChartTooltip formatter={v => '$' + fmt(v)} />} />
-              <Bar dataKey="pnl" radius={[4, 4, 0, 0]} name="PnL">
-                {stats.monthlyArr.map((entry, i) => (
-                  <Cell key={i} fill={entry.pnl >= 0 ? T.green : T.red} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      {/* ── Row: Drawdown + Distribution ────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <Card>
-          <SectionHead title="Drawdown Chart" sub="Risk Exposure" />
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={(() => {
-              let peak = trades[0]?.equity || 10000
-              return trades.map((tr, i) => {
-                if (tr.equity > peak) peak = tr.equity
-                return { i, dd: -((peak - tr.equity) / peak * 100) }
-              })
-            })()}>
-              <defs>
-                <linearGradient id="ddGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={T.red} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={T.red} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="i" tick={{ fill: T.muted, fontSize: 10 }} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => v + '%'} />
-              <Tooltip content={<ChartTooltip formatter={v => fmt(v) + '%'} />} />
-              <Area type="monotone" dataKey="dd" stroke={T.red} fill="url(#ddGrad)" strokeWidth={2} dot={false} name="Drawdown" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <SectionHead title="P&L Distribution" sub="All Trades Histogram" />
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={stats.distribution} barSize={14}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="label" tick={{ fill: T.muted, fontSize: 9 }} interval={5} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} />
-              <ReferenceLine x={0} stroke={T.muted} strokeDasharray="4 4" />
-              <Tooltip content={<ChartTooltip formatter={(v, n) => [v + ' trades', '']} />} />
-              <Bar dataKey="count" radius={[2, 2, 0, 0]} name="Trades">
-                {stats.distribution.map((d, i) => (
-                  <Cell key={i} fill={d.isPositive ? T.green : T.red} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      {/* ── Row: Long/Short + Win/Loss Donuts + Radar ───────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
-        {/* Win/Loss */}
-        <Card>
-          <SectionHead title="Win / Loss" sub="Trade Outcomes" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <ResponsiveContainer width={140} height={140}>
+          <SectionHead title="Win / Loss Distribution" sub="Trade Outcomes"/>
+          <div style={{ display:'flex',alignItems:'center',gap:20 }}>
+            <ResponsiveContainer width={150} height={150}>
               <PieChart>
-                <Pie data={[{ v: stats.winners }, { v: stats.losers }]} dataKey="v" innerRadius={40} outerRadius={62} paddingAngle={3}>
-                  <Cell fill={T.green} />
-                  <Cell fill={T.red} />
+                <Pie data={[{v:stats.winners},{v:stats.losers}]} dataKey="v" innerRadius={42} outerRadius={64} paddingAngle={2} startAngle={90} endAngle={-270}>
+                  <Cell fill={T.green}/><Cell fill={T.red}/>
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex:1,display:'flex',flexDirection:'column',gap:10 }}>
               {[
-                { l: 'Winners', v: stats.winners, pct: fmt(stats.winRate) + '%', c: T.green },
-                { l: 'Losers',  v: stats.losers,  pct: fmt(100-stats.winRate)+'%', c: T.red },
-              ].map(r => (
-                <div key={r.l} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: `1px solid ${T.border}` }}>
-                  <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                    <div style={{ width: 7, height: 7, borderRadius: '50%', background: r.c }} />
-                    <span style={{ color: T.muted, fontSize: 11 }}>{r.l}</span>
+                { l:'Winners', v:stats.winners, pct:fmt(stats.winRate)+'%', c:T.green, sub:'Avg: +$'+fmt(stats.avgWin) },
+                { l:'Losers',  v:stats.losers,  pct:fmt(100-stats.winRate)+'%', c:T.red, sub:'Avg: -$'+fmt(stats.avgLoss) },
+              ].map(r=>(
+                <div key={r.l} style={{ background:T.surface,borderRadius:7,padding:'10px 12px',border:`1px solid ${T.border}` }}>
+                  <div style={{ display:'flex',justifyContent:'space-between',marginBottom:3 }}>
+                    <span style={{ fontSize:11,color:r.c,fontWeight:600 }}>{r.l}</span>
+                    <span style={{ fontSize:12,fontWeight:700,fontFamily:T.fontMono }}>{r.v} <span style={{ color:r.c }}>{r.pct}</span></span>
                   </div>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <span style={{ fontWeight: 700, fontSize: 12 }}>{r.v}</span>
-                    <span style={{ color: r.c, fontSize: 11, minWidth: 36, textAlign: 'right' }}>{r.pct}</span>
-                  </div>
+                  <div style={{ fontSize:10,color:T.muted }}>{r.sub}</div>
                 </div>
               ))}
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 10, color: T.muted }}>Avg Win</span>
-                  <span style={{ color: T.green, fontSize: 11, fontWeight: 600 }}>+${fmt(stats.avgWin)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 10, color: T.muted }}>Avg Loss</span>
-                  <span style={{ color: T.red, fontSize: 11, fontWeight: 600 }}>-${fmt(stats.avgLoss)}</span>
-                </div>
+              <div style={{ display:'flex',justifyContent:'space-between',padding:'6px 0',borderTop:`1px solid ${T.border}` }}>
+                <span style={{ fontSize:10,color:T.muted }}>Largest Win</span>
+                <span style={{ fontSize:11,color:T.green,fontFamily:T.fontMono }}>+${fmt(stats.largestWin)}</span>
+              </div>
+              <div style={{ display:'flex',justifyContent:'space-between' }}>
+                <span style={{ fontSize:10,color:T.muted }}>Largest Loss</span>
+                <span style={{ fontSize:11,color:T.red,fontFamily:T.fontMono }}>-${fmt(Math.abs(stats.largestLoss))}</span>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Long/Short */}
         <Card>
-          <SectionHead title="Long vs Short" sub="Side Breakdown" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <ResponsiveContainer width={140} height={140}>
-              <PieChart>
-                <Pie data={[{ v: stats.longs }, { v: stats.shorts }]} dataKey="v" innerRadius={40} outerRadius={62} paddingAngle={3}>
-                  <Cell fill={T.blue} />
-                  <Cell fill={T.purple} />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div style={{ flex: 1 }}>
-              {[
-                { l: 'Longs',  v: stats.longs,  pnl: stats.longPnL,  wr: stats.longWR,  c: T.blue },
-                { l: 'Shorts', v: stats.shorts, pnl: stats.shortPnL, wr: stats.shortWR, c: T.purple },
-              ].map(r => (
-                <div key={r.l} style={{ padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: r.c }} />
-                      <span style={{ color: T.muted, fontSize: 11 }}>{r.l}</span>
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 600 }}>{r.v} trades</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: colorPnL(r.pnl) }}>{fmtUSD(r.pnl)}</span>
-                    <span style={{ fontSize: 10, color: r.wr >= 50 ? T.green : T.red }}>{fmt(r.wr)}% WR</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Radar */}
-        <Card>
-          <SectionHead title="Performance Radar" sub="Score Overview" />
-          <ResponsiveContainer width="100%" height={190}>
-            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
-              <PolarGrid stroke={T.border} />
-              <PolarAngleAxis dataKey="metric" tick={{ fill: T.muted, fontSize: 9, fontFamily: T.fontMono }} />
-              <Radar dataKey="val" stroke={T.accent} fill={T.accent} fillOpacity={0.15} strokeWidth={2} />
+          <SectionHead title="Performance Radar" sub="Score Overview"/>
+          <ResponsiveContainer width="100%" height={200}>
+            <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+              <PolarGrid stroke={T.border}/>
+              <PolarAngleAxis dataKey="metric" tick={{ fill:T.muted,fontSize:9,fontFamily:T.fontSans }}/>
+              <Radar dataKey="val" stroke={T.accent} fill={T.accent} fillOpacity={0.12} strokeWidth={2}/>
             </RadarChart>
           </ResponsiveContainer>
         </Card>
       </div>
-
-      {/* ── Hour & Day Heatmap ─────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
-        <Card>
-          <SectionHead title="Profit by Hour of Day" sub="Best Trading Hours" />
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={stats.byHour} barSize={14}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis dataKey="hour" tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={h => `${h}:00`} />
-              <YAxis tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => '$' + fmt(v, 0)} />
-              <ReferenceLine y={0} stroke={T.muted} strokeDasharray="3 3" />
-              <Tooltip content={<ChartTooltip formatter={v => '$' + fmt(v)} />} />
-              <Bar dataKey="pnl" radius={[3, 3, 0, 0]} name="PnL">
-                {stats.byHour.map((d, i) => <Cell key={i} fill={d.pnl >= 0 ? T.green : T.red} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card>
-          <SectionHead title="Profit by Weekday" sub="Best Days" />
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={stats.byDay} layout="vertical" barSize={14}>
-              <CartesianGrid strokeDasharray="3 3" stroke={T.border} />
-              <XAxis type="number" tick={{ fill: T.muted, fontSize: 10 }} tickFormatter={v => '$' + fmt(v, 0)} />
-              <YAxis dataKey="day" type="category" tick={{ fill: T.muted, fontSize: 10 }} width={32} />
-              <ReferenceLine x={0} stroke={T.muted} strokeDasharray="3 3" />
-              <Tooltip content={<ChartTooltip formatter={v => '$' + fmt(v)} />} />
-              <Bar dataKey="pnl" radius={[0, 4, 4, 0]} name="PnL">
-                {stats.byDay.map((d, i) => <Cell key={i} fill={d.pnl >= 0 ? T.green : T.red} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </Card>
-      </div>
-
-      {/* ── Top Symbols Table ──────────────────────────────────────────── */}
-      <Card>
-        <SectionHead title="Symbol Performance" sub="Ranked by P&L" />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {(stats.symbolArr || []).map((sym, i) => {
-            const maxPnl = Math.max(...stats.symbolArr.map(s => Math.abs(s.pnl)))
-            return (
-              <div key={sym.sym} style={{
-                display: 'grid', gridTemplateColumns: '28px 110px 1fr 80px 60px 60px 60px 60px',
-                alignItems: 'center', gap: 12,
-                padding: '10px 14px',
-                background: i % 2 === 0 ? T.surface : 'transparent',
-                borderRadius: 8,
-              }}>
-                <div style={{ fontSize: 11, color: T.muted, fontWeight: 700 }}>#{i+1}</div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: T.text }}>{sym.sym.replace('USDT', '')}<span style={{ color: T.muted, fontSize: 10 }}>/USDT</span></div>
-                <ProgressBar value={Math.abs(sym.pnl)} max={maxPnl} color={sym.pnl >= 0 ? T.green : T.red} height={5} />
-                <div style={{ textAlign: 'right', fontWeight: 700, color: colorPnL(sym.pnl), fontSize: 13 }}>{fmtUSD(sym.pnl)}</div>
-                <div style={{ textAlign: 'right', color: T.muted, fontSize: 11 }}>{sym.count} tr</div>
-                <div style={{ textAlign: 'right', color: parseFloat(sym.wr) >= 50 ? T.green : T.red, fontSize: 11 }}>{sym.wr}%</div>
-                <div style={{ textAlign: 'right', color: T.muted, fontSize: 11 }}>-${fmt(sym.fees)}</div>
-                <div style={{ textAlign: 'right' }}>
-                  <Badge text={sym.pnl >= 0 ? '▲ PROFIT' : '▼ LOSS'} color={sym.pnl >= 0 ? T.green : T.red} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '28px 110px 1fr 80px 60px 60px 60px 60px', gap: 12, padding: '8px 14px', marginTop: 4 }}>
-          <div />
-          <div style={{ fontSize: 9, color: T.muted }}>SYMBOL</div>
-          <div />
-          <div style={{ fontSize: 9, color: T.muted, textAlign: 'right' }}>P&L</div>
-          <div style={{ fontSize: 9, color: T.muted, textAlign: 'right' }}>TRADES</div>
-          <div style={{ fontSize: 9, color: T.muted, textAlign: 'right' }}>WIN%</div>
-          <div style={{ fontSize: 9, color: T.muted, textAlign: 'right' }}>FEES</div>
-          <div />
-        </div>
-      </Card>
     </div>
   )
 }

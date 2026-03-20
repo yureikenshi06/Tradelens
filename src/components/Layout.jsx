@@ -41,7 +41,7 @@ export default function Layout({ children, activePage, onPageChange, connected, 
           <div style={{ fontSize: 22, color: T.accent, flexShrink: 0, lineHeight: 1 }}>◈</div>
           {!collapsed && (
             <div style={{ overflow: 'hidden' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, fontFamily: T.fontDisplay, color: T.accent, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, fontFamily: T.fontSans, color: T.accent, letterSpacing: 0.5, whiteSpace: 'nowrap' }}>
                 TRADE<span style={{ color: T.muted }}>LENS</span>
               </div>
               <div style={{ fontSize: 9, color: T.muted, letterSpacing: 1.5, whiteSpace: 'nowrap' }}>TRADING JOURNAL</div>
@@ -62,7 +62,7 @@ export default function Layout({ children, activePage, onPageChange, connected, 
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: collapsed ? '9px' : '9px 12px',
                   borderRadius: 9, cursor: 'pointer',
-                  fontFamily: T.fontMono, fontSize: 12, fontWeight: active ? 600 : 400,
+                  fontFamily: T.fontSans, fontSize: 12, fontWeight: active ? 600 : 400,
                   background: active ? T.accentDim : 'transparent',
                   color: active ? T.accent : T.textMid,
                   border: active ? `1px solid ${T.accent}33` : '1px solid transparent',
@@ -105,7 +105,7 @@ export default function Layout({ children, activePage, onPageChange, connected, 
             style={{
               width: '100%', padding: '7px', borderRadius: 8,
               background: 'transparent', border: `1px solid ${T.border}`,
-              color: T.muted, fontFamily: T.fontMono, fontSize: 11,
+              color: T.muted, fontFamily: T.fontSans, fontSize: 11,
               cursor: 'pointer', marginBottom: 6,
             }}
           >
@@ -119,7 +119,7 @@ export default function Layout({ children, activePage, onPageChange, connected, 
               </div>
               <button onClick={signOut} style={{
                 fontSize: 10, color: T.red, background: T.redDim, border: `1px solid ${T.red}33`,
-                borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: T.fontMono,
+                borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: T.fontSans,
               }}>Sign Out</button>
             </div>
           )}
