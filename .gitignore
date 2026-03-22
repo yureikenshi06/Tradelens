@@ -12,7 +12,7 @@ dist-ssr/
 .env
 .env.local
 .env.*.local
-.dev.vars          ← Wrangler local secrets
+.dev.vars
 
 # Editor
 .vscode/
