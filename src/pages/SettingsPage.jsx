@@ -4,22 +4,21 @@ import { fmt, fmtDate } from '../lib/data'
 import { Card, SectionHead, Btn, Input } from '../components/UI'
 import { useAuth } from '../hooks/useAuth'
 import { signOut } from '../lib/supabase'
-import { loadKeys, clearKeys } from '../hooks/useTrades'
 
 export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDemo, onDisconnect, source, error: hookError, progress, savedKeys }) {
-  const { user }    = useAuth()
-  const [apiKey,    setApiKey]    = useState('')
+  const { user } = useAuth()
+  const [apiKey, setApiKey] = useState('')
   const [apiSecret, setApiSecret] = useState('')
-  const [saving,    setSaving]    = useState(false)
-  const [msg,       setMsg]       = useState('')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState('')
   const [showSecret, setShowSecret] = useState(false)
 
   const handleConnect = async () => {
     setMsg('')
     setSaving(true)
     const res = await onConnectBinance(apiKey, apiSecret)
-    if (res?.success)  setMsg(`✓ Loaded ${res.count} futures trades across ${res.symbols} symbols!`)
-    else if (res?.demo) setMsg('⚠ Showing demo data — see error above.')
+    if (res?.success) setMsg(`Saved ${res.count} trades. ${res.newCount || 0} new trades were synced.`)
+    else if (res?.demo) setMsg('Showing demo data. See the error above.')
     else if (res?.error) setMsg('')
     setSaving(false)
   }
@@ -27,12 +26,12 @@ export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDe
   const exportCSV = () => {
     const rows = [
       'id,symbol,side,qty,price,exitPrice,pnl,fee,leverage,duration,equity,time',
-      ...trades.map(t => [
+      ...trades.map((t) => [
         t.id, t.symbol, t.side, t.qty, t.price,
-        t.exitPrice||'', t.pnl, t.fee, t.leverage,
+        t.exitPrice || '', t.pnl, t.fee, t.leverage,
         t.duration, t.equity,
-        new Date(t.time).toISOString()
-      ].join(','))
+        new Date(t.time).toISOString(),
+      ].join(',')),
     ].join('\n')
     const a = document.createElement('a')
     a.href = 'data:text/csv,' + encodeURIComponent(rows)
@@ -40,24 +39,15 @@ export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDe
     a.click()
   }
 
-  const STEPS = [
-    {
-      n: '01', title: 'Supabase Setup (Free)',
-      items: ['supabase.com → New Project','Run SQL from src/lib/supabase.js in SQL Editor','Authentication → Users → Add only YOUR email','Project Settings → API → copy URL + anon key → paste in .env'],
-    },
-    {
-      n: '02', title: 'Deploy to Cloudflare Pages (Free)',
-      items: ['Push code to GitHub (private repo)','dash.cloudflare.com → Workers & Pages → Create → Pages → Connect to Git','Build command: npm run build  |  Output dir: dist  |  Functions dir: functions','Add env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY → Save & Deploy'],
-    },
-    {
-      n: '03', title: 'Add Server-Side API Keys',
-      items: ['Cloudflare Pages → your project → Settings → Environment Variables','Add GROQ_API_KEY (free at console.groq.com) for AI Analysis','Add BINANCE_API_KEY + BINANCE_API_SECRET if you want server-side Binance fallback','Redeploy after adding variables'],
-    },
-    {
-      n: '04', title: 'Local Development',
-      items: ['Copy .dev.vars.example → .dev.vars and fill in your keys','npm run build  then  npx wrangler pages dev dist','Or just: npm run dev  (Binance connects directly from browser — no server needed)','Rename your site: Cloudflare Pages → your project → Custom Domains or Settings → Name'],
-    },
-  ]
+  const statusLabel =
+    source === 'binance'
+      ? `Binance Live (${trades.length} trades)`
+      : source === 'database'
+        ? `Saved Cache (${trades.length} trades)`
+        : 'Demo Mode'
+
+  const statusColor = source === 'binance' ? T.green : T.accent
+  const statusBg = source === 'binance' ? T.greenDim : T.accentDim
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 860 }}>
@@ -66,7 +56,6 @@ export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDe
         <div style={{ fontSize: 30, fontWeight: 800, fontFamily: T.fontDisplay }}>Settings</div>
       </div>
 
-      {/* Account */}
       <Card style={{ marginBottom: 14 }}>
         <SectionHead title="Account" sub="Authentication" />
         {user ? (
@@ -74,59 +63,63 @@ export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDe
             <div>
               <div style={{ fontSize: 11, color: T.muted, marginBottom: 3 }}>Signed in as</div>
               <div style={{ fontWeight: 700 }}>{user.email}</div>
-              <div style={{ fontSize: 10, color: T.muted, marginTop: 3 }}>UID: {user.id?.slice(0,16)}...</div>
+              <div style={{ fontSize: 10, color: T.muted, marginTop: 3 }}>UID: {user.id?.slice(0, 16)}...</div>
             </div>
             <Btn variant="danger" onClick={signOut}>Sign Out</Btn>
           </div>
         ) : (
           <div style={{ color: T.muted, fontSize: 12 }}>
-            Not signed in — running in demo mode. Notes saved locally only.
+            Not signed in. Running in demo mode.
           </div>
         )}
       </Card>
 
-      {/* Binance Connection */}
       <Card style={{ marginBottom: 14 }}>
         <SectionHead title="Binance Live Data" sub="API Connection" />
 
-        {/* Status badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: source === 'binance' ? T.greenDim : T.accentDim,
-            border: `1px solid ${source === 'binance' ? T.green : T.accent}44`,
-            borderRadius: 8, padding: '7px 14px', fontSize: 11,
-            color: source === 'binance' ? T.green : T.accent,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: statusBg,
+            border: `1px solid ${statusColor}44`,
+            borderRadius: 8,
+            padding: '7px 14px',
+            fontSize: 11,
+            color: statusColor,
           }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: source === 'binance' ? T.green : T.accent }} />
-            {source === 'binance' ? `Binance Live (${trades.length} trades)` : 'Demo Mode'}
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor }} />
+            {statusLabel}
           </div>
           {source === 'binance' && (
             <Btn onClick={onLoadDemo} style={{ fontSize: 11, padding: '5px 12px' }}>Switch to Demo</Btn>
           )}
         </div>
 
-        {/* API key inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
           <div>
             <div style={{ fontSize: 10, color: T.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 5 }}>API Key</div>
             <Input
               value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
+              onChange={(e) => setApiKey(e.target.value)}
               placeholder="Binance API Key (read-only)"
             />
           </div>
           <div>
             <div style={{ fontSize: 10, color: T.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 5 }}>
               Secret Key
-              <button onClick={() => setShowSecret(s=>!s)} style={{ marginLeft: 8, background: 'none', border: 'none', color: T.accent, cursor: 'pointer', fontSize: 10, fontFamily: T.fontMono }}>
+              <button
+                onClick={() => setShowSecret((s) => !s)}
+                style={{ marginLeft: 8, background: 'none', border: 'none', color: T.accent, cursor: 'pointer', fontSize: 10, fontFamily: T.fontMono }}
+              >
                 {showSecret ? 'hide' : 'show'}
               </button>
             </div>
             <Input
               type={showSecret ? 'text' : 'password'}
               value={apiSecret}
-              onChange={e => setApiSecret(e.target.value)}
+              onChange={(e) => setApiSecret(e.target.value)}
               placeholder="Binance API Secret"
             />
           </div>
@@ -136,65 +129,67 @@ export default function SettingsPage({ trades, stats, onConnectBinance, onLoadDe
             disabled={saving || !apiKey || !apiSecret}
             style={{ padding: '10px', fontSize: 13 }}
           >
-            {saving ? (progress || 'Connecting...') : '⚡ Connect to Binance'}
+            {saving ? (progress || 'Connecting...') : 'Sync Binance Trades'}
           </Btn>
         </div>
 
-        {/* Progress */}
         {progress && saving && (
           <div style={{ fontSize: 12, color: T.accent, padding: '8px 12px', background: T.accentDim, borderRadius: 7, marginBottom: 8 }}>
-            ⏳ {progress}
+            {progress}
           </div>
         )}
 
-        {/* Error from hook */}
         {hookError && (
           <div style={{ fontSize: 12, color: T.red, padding: '10px 14px', background: T.redDim, border: `1px solid ${T.red}33`, borderRadius: 8, marginBottom: 8, lineHeight: 1.6 }}>
-            ⚠ {hookError}
+            {hookError}
           </div>
         )}
 
-        {/* Success msg */}
         {msg && !hookError && (
           <div style={{ fontSize: 12, color: T.green, padding: '8px 12px', background: T.greenDim, border: `1px solid ${T.green}33`, borderRadius: 7, marginBottom: 8 }}>
             {msg}
           </div>
         )}
 
-        {/* Auto-save status */}
         {savedKeys && (
-          <div style={{ padding:'10px 14px',background:T.greenDim,border:`1px solid ${T.green}33`,borderRadius:8,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-            <div style={{ fontSize:12,color:T.green }}>✓ API keys saved for this session — auto-connects on next visit</div>
-            <button onClick={()=>{ if(onDisconnect) onDisconnect() }} style={{ background:'none',border:`1px solid ${T.red}44`,color:T.red,borderRadius:5,padding:'3px 10px',cursor:'pointer',fontFamily:T.fontSans,fontSize:11 }}>
+          <div style={{ padding: '10px 14px', background: T.greenDim, border: `1px solid ${T.green}33`, borderRadius: 8, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div style={{ fontSize: 12, color: T.green }}>
+              API keys saved for this session. Login loads cached trades first, then syncs only new trades.
+            </div>
+            <button onClick={() => { if (onDisconnect) onDisconnect() }} style={{ background: 'none', border: `1px solid ${T.red}44`, color: T.red, borderRadius: 5, padding: '3px 10px', cursor: 'pointer', fontFamily: T.fontSans, fontSize: 11 }}>
               Forget Keys
             </button>
           </div>
         )}
+
         <div style={{ padding: '12px 14px', background: T.surface, borderRadius: 10, fontSize: 11, color: T.muted, lineHeight: 1.8, borderLeft: `3px solid ${T.green}` }}>
-          <div style={{ fontWeight: 700, color: T.green, marginBottom: 6 }}>✓ Direct connection — works on Netlify</div>
+          <div style={{ fontWeight: 700, color: T.green, marginBottom: 6 }}>Direct connection with cached database sync</div>
           <div>Your browser signs requests directly. Secret key never leaves your device.</div>
-          <div style={{ marginTop:4 }}>Keys are saved in <strong style={{ color:T.textMid }}>sessionStorage</strong> — auto-loads when you return to the tab. Cleared when browser closes.</div>
-          <div style={{ marginTop:4,color:T.accent }}>Make sure your Binance API key has <strong>Enable Futures</strong> turned ON and IP restriction set to <strong>Unrestricted</strong>.</div>
+          <div style={{ marginTop: 4 }}>
+            Keys are saved in <strong style={{ color: T.textMid }}>sessionStorage</strong>. Trades are saved in Supabase so the next login can reuse cached data and fetch only newer trades.
+          </div>
+          <div style={{ marginTop: 4, color: T.accent }}>
+            Make sure your Binance API key has <strong>Enable Futures</strong> turned on and IP restriction set to <strong>Unrestricted</strong>.
+          </div>
         </div>
       </Card>
 
-      {/* Data Summary */}
       <Card style={{ marginBottom: 14 }}>
         <SectionHead title="Data Summary" sub="Current Session" />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
           {[
-            { l: 'Trades',   v: trades.length },
-            { l: 'Symbols',  v: [...new Set(trades.map(t=>t.symbol))].length },
-            { l: 'From',     v: trades.length ? fmtDate(Math.min(...trades.map(t=>t.time))) : '—' },
-            { l: 'Net P&L',  v: (stats.totalPnL>=0?'+$':'-$')+fmt(Math.abs(stats.totalPnL)) },
-          ].map(r => (
+            { l: 'Trades', v: trades.length },
+            { l: 'Symbols', v: [...new Set(trades.map((t) => t.symbol))].length },
+            { l: 'From', v: trades.length ? fmtDate(Math.min(...trades.map((t) => t.time))) : '-' },
+            { l: 'Net P&L', v: `${stats.totalPnL >= 0 ? '+$' : '-$'}${fmt(Math.abs(stats.totalPnL || 0))}` },
+          ].map((r) => (
             <div key={r.l} style={{ background: T.surface, borderRadius: 9, padding: '12px 14px' }}>
               <div style={{ fontSize: 9, color: T.muted, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>{r.l}</div>
               <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontDisplay }}>{r.v}</div>
             </div>
           ))}
         </div>
-        <Btn variant="success" onClick={exportCSV} style={{ padding: '10px 20px' }}>↓ Export CSV ({trades.length} trades)</Btn>
+        <Btn variant="success" onClick={exportCSV} style={{ padding: '10px 20px' }}>Export CSV ({trades.length} trades)</Btn>
       </Card>
     </div>
   )

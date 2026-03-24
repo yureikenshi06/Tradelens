@@ -49,7 +49,9 @@ function CashFlowPanel() {
       if (uid) {
         fetchCapitalFlow(uid).then(rows => {
           if (rows.length) {
-            setEntries(rows.map(r => ({ ...r, amount:+r.amount })))
+            const normalized = rows.map(r => ({ ...r, amount:+r.amount }))
+            setEntries(normalized)
+            saveCashFlow(normalized)
           } else {
             // Migrate from localStorage if any
             const local = loadCashFlow()
